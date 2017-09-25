@@ -3,6 +3,7 @@ import json
 import asyncio
 from datetime import datetime, timedelta
 import jwt
+import aiohttp
 from aiohttp import web
 import sys
 print(sys.path)
@@ -52,7 +53,11 @@ async def get_user(request):
 
 async def register(request):
     post_data = await request.post()
-    user = await User.Objects.create(request.db, **post_data)
+    try:
+        user = await User.Objects.create(request.db, **post_data)
+    except User.AlreadyExists:
+        return json_response({'message': 'User already exists'}, status=409)
+
     if user:
         return json_response({'message': 'user created'}, status=201)
     else:
@@ -77,7 +82,8 @@ async def auth_middleware(app, handler):
 async def db_injector_middleware(app, handler):
     async def middleware(request):
         request.db = app.db
-        return middleware
+        return await handler(request)
+    return middleware
 
 async def init_db():
     db = await DB.create()
@@ -92,3 +98,5 @@ app.router.add_route('GET', '/get-user', get_user)
 app.router.add_route('POST', '/login', login)
 app.router.add_route('POST', '/register', register)
 
+if __name__ == "__main__":
+    web.run_app(app, host='localhost', port=8080)

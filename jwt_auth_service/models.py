@@ -8,9 +8,9 @@ cfg = vars(config)
 
 class User:
 
-    def __init__(self, db, username, email, password, is_admin, user_id=None, hash_pwd=True):
+    def __init__(self, db, username, email, password, is_admin=False, user_id=None, hash_pwd=True):
         self.db = db
-        self.id = user_id
+        self.user_id = user_id
         self.email = email
         self.password = password
         self.is_admin = is_admin
@@ -49,8 +49,10 @@ class User:
         else:
             return False
 
-    def save(self):
-        if self.db.save_user(vars(self)):
+    async def save(self):
+        user_id = await self.db.save_user(vars(self))
+        if user_id > 0:
+            self.user_id = user_id  # if new user then sets he's id
             return self
         else:
             return None
@@ -75,10 +77,10 @@ class User:
 
         @classmethod
         async def create(cls, db, username, email, password, is_admin=False):
-            if await db.exists(username, email):
+            if await db.user_exists(username, email):
                 raise User.AlreadyExists()
             else:
-                return User(username, email, password, is_admin).save()
+                return await User(db, username, email, password, is_admin).save()
 
         @classmethod
         def all(cls):
@@ -103,4 +105,4 @@ class User:
 
         @classmethod
         async def save(cls, usr):
-            return usr.save()
+            return await usr.save()

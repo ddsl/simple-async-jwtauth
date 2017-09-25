@@ -10,43 +10,56 @@ class DB(object):
     async def create(cls):
         self = DB()
         self._pool = await aioredis.create_pool(
-                ('localhost', 6379))
+                ('localhost', 6379),
+                minsize=5,
+                encoding='utf-8')
         return self
 
     async def execute(self, *args, **kwargs):
         return await self._pool.execute(*args, **kwargs)
 
     async def user_exists(self, username=None, email=None):
-        exists = False
-        with self._pool as redis:
+        with await self._pool as redis:
+            user_id = False
             if username:
-                return await redis.exists("{0}:user:{1}".format(config.DB_PREF, username))
-            if email:
-                return await redis.exists("{0}:email:{1}".format(config.DB_PREF, email))
+                user_id = await redis.hget("{0}:users".format(config.DB_PREF), username)
+                if user_id:
+                    int(user_id)
+            # not implemented
+            #if email:
+            #   user_id = await redis.exists("{0}:emails:{1}".format(config.DB_PREF, email))
 
-            return exists
+        return bool(user_id)
 
     async def save_user(self, user_data):
         """
         :param  user_data -> dist of user data
         Saves user to db
         """
-        with self._pool as redis:
+        with await self._pool as redis:
             new_user = False
-            if not getattr(user_data, 'user_id'):
-                while not redis.watch('current_user_id'):
+            if not getattr(user_data, 'user_id', None):
+                while not await redis.watch('current_user_id'):
                     continue
-                user_id = redis.get('current_user_id')
-                user_data['user_id'] = user_id + 1
+                user_id = await redis.get('current_user_id') or 0
+                user_data['user_id'] = int(user_id) + 1
                 new_user = True
 
             db_user = "{0}:user:{1}".format(config.DB_PREF, user_data['user_id'])
-            while not redis.watch(db_user):
+            while not await redis.watch(db_user):
                 continue
-            saved = redis.hmset(db_user, user_data)
+            #saved = await redis.hmset_dict(db_user, user_data)
+            saved = await redis.hmset(db_user,
+                                      'username', user_data['username'],
+                                      'email', user_data['email'],
+                                      'is_admin', int(user_data['is_admin']),
+                                      'password', user_data['password'],)
             if saved & new_user:
-                redis.incr('current_user_id')
+                await redis.incr('current_user_id')
+                await redis.hset("{0}:users".format(config.DB_PREF),
+                                 user_data['username'],
+                                 user_data['user_id'])
 
-            redis.unwatch()
+            await redis.unwatch()
             return user_data['user_id'] if saved else None
 
