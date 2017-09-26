@@ -15,6 +15,10 @@ class DB(object):
                 encoding='utf-8')
         return self
 
+    async def close(self):
+        self._pool.close()
+        await self._pool.wait_closed()
+
     async def execute(self, *args, **kwargs):
         return await self._pool.execute(*args, **kwargs)
 
@@ -28,8 +32,28 @@ class DB(object):
             # not implemented
             #if email:
             #   user_id = await redis.exists("{0}:emails:{1}".format(config.DB_PREF, email))
-
         return bool(user_id)
+
+    async def get_id_by_username(self, username=''):
+        if not username:
+            return None
+        source = "{0}:users".format(config.DB_PREF)
+        with await self._pool as redis:
+            id = await redis.hget(source, username)
+            return int(id) if id else None
+
+    async def get_user(self, id=None, username=None):
+        with await self._pool as redis:
+            if username:
+                id = await self.get_id_by_username(username)
+            if id:
+                source = "{0}:user:{1}".format(config.DB_PREF, id)
+                user_data = await redis.hgetall(source)
+                if user_data:
+                    user_data['user_id'] = id
+                    user_data['is_admin'] = bool(int(user_data['is_admin']))
+                return user_data
+            return None
 
     async def save_user(self, user_data):
         """

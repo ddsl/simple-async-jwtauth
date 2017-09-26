@@ -34,13 +34,13 @@ async def login(request):
     post_data = await request.post()
 
     try:
-        user = User.Objects.get(email=post_data['email'])
+        user = await User.Objects.get(request.db, username=post_data['username'])
         user.match_password(post_data['password'])
     except (User.DoesNotExist, User.PasswordDoesNotMatch):
         return json_response({'message': 'Wrong credentials'}, status=400)
 
     payload = {
-        'user_id': user.id,
+        'user_id': user.user_id,
         'exp': datetime.utcnow() + timedelta(seconds=JWT_EXP_DELTA_SECONDS)
     }
     jwt_token = jwt.encode(payload, JWT_SECRET, JWT_ALGORITHM)

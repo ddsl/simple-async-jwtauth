@@ -87,21 +87,12 @@ class User:
             return cls._storage
 
         @classmethod
-        def filter(cls, **kwargs):
-            users = cls._storage
-            for k, v in kwargs.items():
-                if v:
-                    users = [u for u in users if getattr(u, k, None) == v]
-            return users
-
-        @classmethod
-        async def get(cls, user_id=None, username=None, email=None):
-            users = cls.filter(user_id=user_id, username=username, email=email)
-            if len(users) > 1:
-                raise User.TooManyObjects
-            if len(users) == 0:
-                raise User.DoesNotExist
-            return users[0]
+        async def get(cls, db, user_id=None, username=None):
+            user_data = await db.get_user(user_id, username)
+            if user_data:
+                return User(db, **user_data, hash_pwd=False)
+            else:
+                raise User.DoesNotExist()
 
         @classmethod
         async def save(cls, usr):
