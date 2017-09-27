@@ -3,17 +3,11 @@ import json
 import asyncio
 from datetime import datetime, timedelta
 import jwt
-import aiohttp
+
 from aiohttp import web
-import sys
-print(sys.path)
+from jwt_auth_service.config import JWT_SECRET, JWT_ALGORITHM, JWT_EXP_DELTA_SECONDS
 from jwt_auth_service.database import DB
 from jwt_auth_service.models import User
-
-
-JWT_SECRET = 'secret'
-JWT_ALGORITHM = 'HS256'
-JWT_EXP_DELTA_SECONDS = 20
 
 
 def json_response(body='', **kwargs):
@@ -59,7 +53,14 @@ async def register(request):
         return json_response({'message': 'User already exists'}, status=409)
 
     if user:
-        return json_response({'message': 'user created'}, status=201)
+        payload = {
+            'user_id': user.user_id,
+            'exp': datetime.utcnow() + timedelta(seconds=JWT_EXP_DELTA_SECONDS)
+        }
+        jwt_token = jwt.encode(payload, JWT_SECRET, JWT_ALGORITHM)
+        return json_response({'message': 'user created',
+                              'token': jwt_token.decode('utf-8')},
+                             status=201)
     else:
         return json_response({'message': 'failed'})
 
@@ -69,13 +70,10 @@ async def auth_middleware(app, handler):
         jwt_token = request.headers.get('authorization', None)
         if jwt_token:
             try:
-                payload = jwt.decode(jwt_token, JWT_SECRET,
-                                     algorithms=[JWT_ALGORITHM])
+                payload = jwt.decode(jwt_token, JWT_SECRET, algorithms=JWT_ALGORITHM)
             except (jwt.DecodeError, jwt.ExpiredSignatureError):
-                return json_response({'message': 'Token is invalid'},
-                                     status=400)
-
-            request.user = User.Objects.get(id=payload['user_id'])
+                return json_response({'message': 'Token is invalid'}, status=400)
+            request.user = await User.Objects.get(db=request.db, user_id=payload['user_id'])
         return await handler(request)
     return middleware
 
@@ -89,8 +87,8 @@ async def init_db():
     db = await DB.create()
     return db
 
-app = web.Application(middlewares=[auth_middleware,
-                                   db_injector_middleware])
+app = web.Application(middlewares=[db_injector_middleware,
+                                   auth_middleware,])
 loop = asyncio.get_event_loop()
 app.db = loop.run_until_complete(init_db())
 
