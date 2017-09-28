@@ -40,6 +40,15 @@ async def login(request):
     jwt_token = jwt.encode(payload, JWT_SECRET, JWT_ALGORITHM)
     return json_response({'token': jwt_token.decode('utf-8')})
 
+async def verify(request):
+    post_data = await request.post()
+    if 'token' in post_data:
+        try:
+            payload = jwt.decode(post_data['token'], JWT_SECRET, algorithms=JWT_ALGORITHM)
+        except (jwt.DecodeError, jwt.ExpiredSignatureError):
+            return json_response({'message': 'Token is invalid'}, status=400)
+        return json_response({'message': 'Valid'}, status=200)
+    return json_response({'message': 'Token not found'}, status=404)
 
 @login_required
 async def get_user(request):
@@ -95,6 +104,7 @@ app.db = loop.run_until_complete(init_db())
 app.router.add_route('GET', '/get-user', get_user)
 app.router.add_route('POST', '/login', login)
 app.router.add_route('POST', '/register', register)
+app.router.add_route('POST', '/verify', verify)
 
 if __name__ == "__main__":
     web.run_app(app, host='localhost', port=8080)
