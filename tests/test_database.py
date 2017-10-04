@@ -20,9 +20,8 @@ async def db_setup(request):
 class TestDB:
     @pytest.mark.asyncio
     async def test_connection(self):
-        db = await DB.create() #tryin use this line instead of db_setup fixture (that doesn't work) and test rerurn error:
-                               #TypeError: object DB can't be used in 'await' expression
-        with await db as redis:
+        db = await DB.create()
+        with await db._pool as redis:
             res = await redis.ping()
             print(res)
             assert res, "PONG"
