@@ -15,14 +15,12 @@ def json_response(body='', **kwargs):
     kwargs['content_type'] = 'text/json'
     return web.Response(**kwargs)
 
-
 def login_required(func):
     def wrapper(request):
         if not request.user:
             return json_response({'message': 'Auth required'}, status=401)
         return func(request)
     return wrapper
-
 
 async def login(request):
     post_data = await request.post()
@@ -97,7 +95,7 @@ async def init_db():
     return db
 
 app = web.Application(middlewares=[db_injector_middleware,
-                                   auth_middleware,])
+                                   auth_middleware, ])
 loop = asyncio.get_event_loop()
 app.db = loop.run_until_complete(init_db())
 
