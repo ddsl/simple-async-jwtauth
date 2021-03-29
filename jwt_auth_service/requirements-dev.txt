@@ -15,7 +15,7 @@ idna==2.6
 multidict==3.2.0
 py==1.4.34
 pycparser==2.18
-Pygments==2.2.0
+Pygments==2.7.4
 PyJWT==1.4.0
 pytest==3.2.2
 pytest-asyncio==0.8.0
